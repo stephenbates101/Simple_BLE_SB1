@@ -152,17 +152,6 @@ include simpledbus/src/base/Logging.h
 include simpledbus/src/base/Message.cpp
 include simpledbus/src/base/Path.cpp
 include simpledbus/src/interfaces/ObjectManager.cpp
-include simplepyble/CMakeLists.txt
-include simplepyble/README.rst
-include simplepyble/requirements.txt
-include simplepyble/src/main.cpp
-include simplepyble/src/simplepyble/__init__.py
-include simplepyble/src/wrap_adapter.cpp
-include simplepyble/src/wrap_characteristic.cpp
-include simplepyble/src/wrap_descriptor.cpp
-include simplepyble/src/wrap_peripheral.cpp
-include simplepyble/src/wrap_service.cpp
-include simplepyble/src/wrap_types.cpp
 prune .github
 prune docs
 prune examples
