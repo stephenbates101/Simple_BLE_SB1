@@ -17,3 +17,6 @@ endif()
 
 # C++
 add_subdirectory(Indra_BT_v1)
+add_subdirectory(IndraApp_v1)
+add_subdirectory(read)
+

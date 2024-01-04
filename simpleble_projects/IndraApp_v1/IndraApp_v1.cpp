@@ -14,14 +14,13 @@ using namespace std::chrono_literals;
 int main() {
 
     // Define a constant string for the App Name which is the peripheral identifier we are looking for
-    // const std::string INSTALLER_APP_NAME = "Indra_Installer_App";
     const std::string INSTALLER_APP_NAME = "IndraApp";
 
     // Define a constant string for the Service UUID
-    const std::string SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    const std::string SERVICE_UUID = "0a4b7471-21dd-4acd-a4c6-191fec072157";
 
-    // Define a constant string for the Characteristic UUID
-    const std::string CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+    // Define a constant string for the Read Characteristic UUID
+    const std::string CHARACTERISTIC_UUID = "9c099460-a0fb-46b5-b717-5a4873f913e5";
 
     // Define a constant string for the Response to the App that the process has succeeded
     const std::string RESPONSE_MESSAGE = "Data Transfer Success";
@@ -44,8 +43,8 @@ int main() {
 
     adapter.set_callback_on_scan_start([]() { std::cout << "Scan started." << std::endl; });
     adapter.set_callback_on_scan_stop([]() { std::cout << "Scan stopped." << std::endl; });
-    
-    // Start the scan 
+
+    // Start the scan
     adapter.scan_start();
 
     // Set a boolean to indicate that the scan if happening
@@ -66,7 +65,7 @@ int main() {
     // Start a while loop for Delay Time and the Scan is Active
     while ((Counter < DELAY_TIME) && (Scan_Active))
     {
-        adapter.set_callback_on_scan_found([&](SimpleBLE::Peripheral peripheral) 
+        adapter.set_callback_on_scan_found([&](SimpleBLE::Peripheral peripheral)
         {
             peripherals.push_back(peripheral);
             // Does the peripheral identifier match the App name
@@ -93,41 +92,52 @@ int main() {
         // Increment the counter
         Counter++;
     }
-     
+
     // If Scan Active is still false at this point then we have timed out so no
     // App was detected and so we should exit with an error
     if (Scan_Active)
     {
         std::cout << "Error: No Target Device Found" << std::endl;
         return EXIT_FAILURE;
-    } 
-    
+    }
+
     // Scan was a success so select the device to connect to from vector list
     auto peripheral = peripherals[Target_Index];
-    
+
     // Declare a boolean to check is we are connected to the App
     bool App_Connected = false;
-    
+
     // Zero the counter
     Counter = 0;
 
+    std::cout << "Trying to pair" << std::endl;
+
     // Start a while loop for Delay Time and check connection
-    while ((Counter < DELAY_TIME) && (!App_Connected))
-    {
-        peripheral.connect();
-        // Add a short delay
-        std::this_thread::sleep_for(0.5s);
+    while ((Counter < DELAY_TIME) && (!App_Connected)) {
+        // Try and connect but catch errors
+        try
+        {
+            peripheral.connect();
+        }
+        catch(...)
+        {
+            // Add a short delay
+            std::this_thread::sleep_for(1s);
+        }
         // Check for a connection
         if (peripheral.is_connected())
         {
             // We are connected so exit the loop
             App_Connected = true;
-            std::cout << "Target Device connected" << std::endl;
+            std::cout << "Target Connected" << std::endl;
         }
-        // Add a short delay
-        std::this_thread::sleep_for(0.5s);
-        // Increment the Counter
-        Counter++;
+        else
+        {
+            // Add a short delay
+            // std::this_thread::sleep_for(0.5s);
+            // Increment the Counter
+            Counter++;
+        }
     }
 
     // If the App is not connect at the point we exit with an error
@@ -146,9 +156,9 @@ int main() {
     // Store all service and characteristic uuids in a vector.
     std::vector<std::pair<SimpleBLE::BluetoothUUID, SimpleBLE::BluetoothUUID>> uuids;
 
-    for (auto service : peripheral.services()) 
+    for (auto service : peripheral.services())
     {
-        for (auto characteristic : service.characteristics()) 
+        for (auto characteristic : service.characteristics())
         {
             uuids.push_back(std::make_pair(service.uuid(), characteristic.uuid()));
             // Check to see if these characteristics match the ones we are looking for
@@ -156,6 +166,7 @@ int main() {
             {
                 // Store the service number
                 Target_Uuid = Service_Index;
+                std::cout << "Read service detected" << std::endl;
             }
             else
             {
@@ -172,9 +183,17 @@ int main() {
         std::cout << "Error: Service not detected" << std::endl;
         return EXIT_FAILURE;
     }
+    else
+    {
+        // Services Received to send feed back
+        std::cout << "Services Detected" << std::endl;
+    }
 
     // Set a boolean to indicate that the correct data has been received
     bool Data_Received = false;
+
+    // Declare and String for the output
+    std::string Output_String;
 
     // Zero the Counter
     Counter = 0;
@@ -182,22 +201,33 @@ int main() {
     // Attempt to read the characteristic for the Delay Time.
     while ((Counter < DELAY_TIME) && (!Data_Received))
     {
-        SimpleBLE::ByteArray rx_data = peripheral.read(uuids[Target_Uuid].first, uuids[Target_Uuid].second);
-        std::string Output_String;
-        for (size_t i = 0; i < rx_data.length(); i++)
+        SimpleBLE::ByteArray rx_data;
+        // Read the Data
+        try
         {
-            char ch = rx_data[i];
-            Output_String += ch;
+            rx_data = peripheral.read(uuids[Target_Uuid].first, uuids[Target_Uuid].second);
         }
-        std::cout << Output_String << std::endl;
-        // If the Output String contains the Check String we can stop
-        if (Output_String.find(Check_String) != std::string::npos)
+        catch (...)
         {
-            // Found the correct data, stop reading
-            Data_Received = true;
+            // Add a delay
+            std::this_thread::sleep_for(0.5s);
         }
-        // Add a short delay
-        std::this_thread::sleep_for(1s);
+        // Check if data has been received
+        if (rx_data.length() > 0)
+        {
+            for (size_t i = 0; i < rx_data.length(); i++) {
+                char ch = rx_data[i];
+                Output_String += ch;
+            }
+            std::cout << Output_String << std::endl;
+            // If the Output String contains the Check String we can stop
+            if (Output_String.find(Check_String) != std::string::npos) {
+                // Found the correct data, stop reading
+                Data_Received = true;
+            }
+        }
+        // Add a delay
+        std::this_thread::sleep_for(0.5s);
         // Increment the counter
         Counter++;
     }
@@ -217,10 +247,32 @@ int main() {
         return EXIT_FAILURE;
     }
 
+    // Parse the OutputString
+    // Declare Strings for SSID and Password
+    std::string SSID_String;
+    std::string Pass_String;
+
+    // Find the position of the & character
+    size_t Position_And = Output_String.find('&');
+
+    SSID_String = Output_String.substr(5, (Position_And - 5));
+    // Add 8 to the number of characters to get the Password position
+    Pass_String = Output_String.substr((Position_And + 10), Output_String.length());
+    
+    std::cout << SSID_String << std::endl;
+    std::cout << Pass_String << std::endl;
+
     // Send the Response Back to the App
     // `write_request` is for unacknowledged writes.
     // `write_command` is for acknowledged writes.
-    peripheral.write_request(uuids[Target_Uuid].first, uuids[Target_Uuid].second, RESPONSE_MESSAGE);
+    try
+    {
+        peripheral.write_request(uuids[Target_Uuid].first, uuids[Target_Uuid].second, RESPONSE_MESSAGE);
+    }
+    catch (...)
+    {
+        std::cout << "Error: Response Not Sent" << std::endl;
+    }
 
     std::cout << "Response Sent" << std::endl;
 
